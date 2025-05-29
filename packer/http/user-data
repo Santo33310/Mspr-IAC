@@ -1,3 +1,4 @@
+#cloud-config
 autoinstall:
   version: 1
   locale: fr_FR
@@ -12,10 +13,16 @@ autoinstall:
     ssh_quiet_keygen: true
     allow_public_ssh_keys: true
 
-  identity:
-    hostname: ubuntu-template
-    username: ubuntu
-    password: "$6$rounds=4096$RmzSUvWt8/0DitQx$XatFLTvKjYTSWKQTYdT4TvPsCzgPI1FNpmZ.g/59z7kJS45AqjIqGj3raVljRJjsaeFKOFRkKGku.TJOmjczM."
+  packages:
+    - qemu-guest-agent
+    - sudo
+    - curl
+    - wget
+    - openssh-server
+    - gnupg
+    - ca-certificates
+    - net-tools
+    - vim
 
   storage:
     layout:
@@ -29,16 +36,10 @@ autoinstall:
       ens18:
         dhcp4: true
 
-  packages:
-    - qemu-guest-agent
-    - sudo
-    - curl
-    - wget
-    - openssh-server
-    - gnupg
-    - ca-certificates
-    - net-tools
-    - vim
+  identity:
+    hostname: ubuntu-template
+    username: ubuntu
+    password: "$6$rounds=4096$RmzSUvWt8/0DitQx$XatFLTvKjYTSWKQTYdT4TvPsCzgPI1FNpmZ.g/59z7kJS45AqjIqGj3raVljRJjsaeFKOFRkKGku.TJOmjczM."
 
   late-commands:
     - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/90-cloud-init-users
