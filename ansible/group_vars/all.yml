@@ -1,5 +1,56 @@
 # Version de K3s à installer
 k3s_version: "v1.28.4+k3s2"
 
-# IP du master K3s
+# Configuration réseau
 master_ip: "192.168.1.109"
+network_cidr: "10.42.0.0/16"
+service_cidr: "10.43.0.0/16"
+
+# Configuration système
+system_packages:
+  - curl
+  - python3
+  - python3-pip
+  - ntp
+  - open-iscsi
+  - nfs-common
+  - htop
+  - iotop
+  - net-tools
+
+# Configuration sécurité
+firewall_ports:
+  - 6443  # Kubernetes API
+  - 8472  # VXLAN (Flannel)
+  - 10250 # kubelet
+  - 2379  # etcd client port
+  - 2380  # etcd peer port
+
+# Configuration Kubernetes
+k8s_config_dir: "/etc/rancher/k3s"
+kubeconfig_path: "{{ k8s_config_dir }}/k3s.yaml"
+
+# Configuration MetalLB
+metallb_version: "0.13.12"
+metallb_namespace: "metallb-system"
+metallb_ip_range: "192.168.1.200-192.168.1.250"
+
+# Configuration Ingress-Nginx
+ingress_nginx_version: "4.9.0"
+ingress_nginx_namespace: "ingress-nginx"
+
+# Configuration Cert-Manager
+cert_manager_version: "1.13.3"
+cert_manager_namespace: "cert-manager"
+
+# Configuration NFS Provisioner
+nfs_provisioner_version: "4.0.18"
+nfs_provisioner_namespace: "nfs-provisioner"
+nfs_server: "192.168.1.100"  # À adapter selon votre serveur NFS
+nfs_path: "/srv/nfs/k8s"     # À adapter selon votre configuration
+
+# Configuration Odoo
+odoo_namespace: "odoo"
+odoo_version: "16.0.0"
+odoo_hostname: "odoo.local"  # À adapter selon votre domaine
+odoo_storage_class: "nfs-client"

@@ -1,113 +1,218 @@
 terraform {
   required_providers {
     proxmox = {
-      source  = "Telmate/proxmox"
-      version = "~> 2.9.6"
+      source  = "bpg/proxmox"
+      version = "0.77.1"
     }
   }
 }
 
 provider "proxmox" {
-  pm_api_url      = var.proxmox_api_url
-  pm_user         = var.proxmox_user
-  pm_password     = var.proxmox_password
-  pm_tls_insecure = true
+  endpoint = var.proxmox_api_url
+  username = var.proxmox_user
+  password = var.proxmox_password
+  insecure = true
 }
 
 locals {
-  vm_base_config = {
-    target_node = var.target_node
-    clone       = var.template_name
-    full_clone  = true
-    os_type     = "cloud-init"
-    cores       = var.vm_defaults.cores
-    memory      = var.vm_defaults.memory
-    ciuser      = "ubuntu"
-    cipassword  = "admin"
-    sshkeys     = file("${path.module}/${var.ssh_public_key_file}")
-    boot        = "order=scsi0"
-    scsihw      = "virtio-scsi-single"
-    agent       = 1
-  }
+  ssh_public_key = file("${path.module}/${var.ssh_public_key_file}")
 }
 
 # --------- VM MASTER ---------
-resource "proxmox_vm_qemu" "k3s-master" {
-  name     = "k3s-master"
-  vmid     = 108
+resource "proxmox_virtual_environment_vm" "k3s-master" {
+  name        = "k3s-master"
+  description = "K3s Master Node managed by Terraform"
+  tags        = ["terraform", "k3s", "master"]
+  vm_id       = 108
+  node_name   = var.target_node
 
-  # Fusion avec la configuration de base
-  target_node = local.vm_base_config.target_node
-  clone       = local.vm_base_config.clone
-  full_clone  = local.vm_base_config.full_clone
-  os_type     = local.vm_base_config.os_type
-  cores       = local.vm_base_config.cores
-  memory      = local.vm_base_config.memory
-  sshkeys     = local.vm_base_config.sshkeys
-  ciuser      = local.vm_base_config.ciuser
-  cipassword  = local.vm_base_config.cipassword
-  boot        = local.vm_base_config.boot
-  scsihw      = local.vm_base_config.scsihw
-  agent       = local.vm_base_config.agent
+  clone {
+    vm_id = var.template_id
+    full  = true
+  }
 
-  ipconfig0 = "ip=${var.network_config.base_ip}.${var.vm_ips["k3s-master"]}/${var.network_config.subnet},gw=${var.network_config.gateway}"
+  cpu {
+    cores   = var.vm_defaults.cores
+    sockets = 1
+    type    = "host"
+  }
 
-  network {
-    model  = "virtio"
+  memory {
+    dedicated = var.vm_defaults.memory
+  }
+
+  agent {
+    enabled = true
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  initialization {
+    datastore_id = "local-lvm"
+    dns {
+      domain  = "lab.local"
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+    ip_config {
+      ipv4 {
+        address = "${var.network_config.base_ip}.${var.vm_ips["k3s-master"]}/${var.network_config.subnet}"
+        gateway = var.network_config.gateway
+      }
+    }
+    user_account {
+      username = "ubuntu"
+      password = var.vm_password
+      keys     = [local.ssh_public_key]
+    }
+  }
+
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
   disk {
-    slot     = 0
-    size     = var.vm_defaults.disk_size
-    type     = "scsi"
-    storage  = "local-lvm"
-    iothread = 1
+    datastore_id = "local-lvm"
+    size         = var.vm_defaults.disk_size
+    interface    = "scsi0"
+    file_format  = "raw"
   }
 
-  timeouts {
-    create = "20m"
-    delete = "20m"
-  }
+  on_boot = true
+  started = true
 }
 
 # --------- VM WORKERS ---------
-resource "proxmox_vm_qemu" "k3s-workers" {
-  count    = 2
-  name     = "k3s-worker-${count.index + 1}"
-  vmid     = 109 + count.index
+resource "proxmox_virtual_environment_vm" "k3s-workers" {
+  count       = 2
+  name        = "k3s-worker-${count.index + 1}"
+  description = "K3s Worker Node ${count.index + 1} managed by Terraform"
+  tags        = ["terraform", "k3s", "worker"]
+  vm_id       = 109 + count.index
+  node_name   = var.target_node
 
-  # Fusion avec la configuration de base
-  target_node = local.vm_base_config.target_node
-  clone       = local.vm_base_config.clone
-  full_clone  = local.vm_base_config.full_clone
-  os_type     = local.vm_base_config.os_type
-  cores       = local.vm_base_config.cores
-  memory      = local.vm_base_config.memory
-  sshkeys     = local.vm_base_config.sshkeys
-  ciuser      = local.vm_base_config.ciuser
-  cipassword  = local.vm_base_config.cipassword
-  boot        = local.vm_base_config.boot
-  scsihw      = local.vm_base_config.scsihw
-  agent       = local.vm_base_config.agent
+  clone {
+    vm_id = var.template_id
+    full  = true
+  }
 
-  ipconfig0 = "ip=${var.network_config.base_ip}.${var.vm_ips["k3s-worker-${count.index + 1}"]}/${var.network_config.subnet},gw=${var.network_config.gateway}"
+  cpu {
+    cores   = var.vm_defaults.cores
+    sockets = 1
+    type    = "host"
+  }
 
-  network {
-    model  = "virtio"
+  memory {
+    dedicated = var.vm_defaults.memory
+  }
+
+  agent {
+    enabled = true
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  initialization {
+    datastore_id = "local-lvm"
+    dns {
+      domain  = "lab.local"
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+    ip_config {
+      ipv4 {
+        address = "${var.network_config.base_ip}.${var.vm_ips["k3s-worker-${count.index + 1}"]}/${var.network_config.subnet}"
+        gateway = var.network_config.gateway
+      }
+    }
+    user_account {
+      username = "ubuntu"
+      password = var.vm_password
+      keys     = [local.ssh_public_key]
+    }
+  }
+
+  network_device {
     bridge = "vmbr0"
+    model  = "virtio"
   }
 
   disk {
-    slot     = 0
-    size     = var.vm_defaults.disk_size
-    type     = "scsi"
-    storage  = "local-lvm"
-    iothread = 1
+    datastore_id = "local-lvm"
+    size         = var.vm_defaults.disk_size
+    interface    = "scsi0"
+    file_format  = "raw"
   }
 
-  timeouts {
-    create = "20m"
-    delete = "20m"
+  on_boot = true
+  started = true
+}
+
+# --------- VM NFS ---------
+resource "proxmox_virtual_environment_vm" "Vm-nfs" {
+  name        = "Vm-nfs"
+  description = "NFS Server managed by Terraform"
+  tags        = ["terraform", "nfs"]
+  vm_id       = 111
+  node_name   = var.target_node
+
+  clone {
+    vm_id = var.template_id
+    full  = true
   }
+
+  cpu {
+    cores   = var.vm_defaults.cores
+    sockets = 1
+    type    = "host"
+  }
+
+  memory {
+    dedicated = var.vm_defaults.memory
+  }
+
+  agent {
+    enabled = true
+  }
+
+  operating_system {
+    type = "l26"
+  }
+
+  initialization {
+    datastore_id = "local-lvm"
+    dns {
+      domain  = "lab.local"
+      servers = ["1.1.1.1", "8.8.8.8"]
+    }
+    ip_config {
+      ipv4 {
+        address = "${var.network_config.base_ip}.${var.vm_ips["Vm-nfs"]}/${var.network_config.subnet}"
+        gateway = var.network_config.gateway
+      }
+    }
+    user_account {
+      username = "ubuntu"
+      password = var.vm_password
+      keys     = [local.ssh_public_key]
+    }
+  }
+
+  network_device {
+    bridge = "vmbr0"
+    model  = "virtio"
+  }
+
+  disk {
+    datastore_id = "local-lvm"
+    size         = var.vm_defaults.disk_size
+    interface    = "scsi0"
+    file_format  = "raw"
+  }
+
+  on_boot = true
+  started = true
 }
