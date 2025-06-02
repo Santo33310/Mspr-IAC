@@ -1,0 +1,4 @@
+---
+# Configuration des nœuds worker
+k3s_extra_agent_args: >-
+  --node-label="node.kubernetes.io/worker=true" 

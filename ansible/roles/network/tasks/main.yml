@@ -1,0 +1,32 @@
+---
+- name: Install required packages
+  apt:
+    name: 
+      - python3-apt
+      - python3-setuptools
+    state: present
+    update_cache: true
+
+- name: Configure static IP
+  block:
+    - name: Backup original cloud-init netplan config
+      command: mv /etc/netplan/50-cloud-init.yaml /etc/netplan/50-cloud-init.yaml.bak
+      args:
+        creates: /etc/netplan/50-cloud-init.yaml.bak
+      ignore_errors: true
+
+    - name: Copy Netplan configuration
+      template:
+        src: 50-cloud-init.yaml.j2
+        dest: /etc/netplan/50-cloud-init.yaml
+        mode: '0644'
+
+    - name: Apply Netplan configuration
+      command: netplan apply
+      register: netplan_result
+      failed_when: netplan_result.rc != 0
+      changed_when: true
+
+    - name: Wait for network to be ready
+      wait_for_connection:
+        timeout: 60 

@@ -1,0 +1,121 @@
+---
+- name: Install pip packages
+  pip:
+    name:
+      - kubernetes
+      - openshift
+      - PyYAML
+    state: present
+
+- name: Create namespaces
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: v1
+      kind: Namespace
+      metadata:
+        name: "{{ item }}"
+  loop:
+    - "{{ metallb_namespace }}"
+    - "{{ ingress_nginx_namespace }}"
+    - "{{ cert_manager_namespace }}"
+    - "{{ nfs_provisioner_namespace }}"
+    - "{{ odoo_namespace }}"
+
+- name: Add Helm repositories
+  kubernetes.core.helm_repository:
+    name: "{{ item.name }}"
+    repo_url: "{{ item.url }}"
+  loop:
+    - { name: metallb, url: 'https://metallb.github.io/metallb' }
+    - { name: ingress-nginx, url: 'https://kubernetes.github.io/ingress-nginx' }
+    - { name: jetstack, url: 'https://charts.jetstack.io' }
+    - { name: nfs-subdir-external-provisioner, url: 'https://kubernetes-sigs.github.io/nfs-subdir-external-provisioner/' }
+    - { name: bitnami, url: 'https://charts.bitnami.com/bitnami' }
+
+- name: Install MetalLB
+  kubernetes.core.helm:
+    name: metallb
+    chart_ref: metallb/metallb
+    release_namespace: "{{ metallb_namespace }}"
+    version: "{{ metallb_version }}"
+    wait: true
+
+- name: Configure MetalLB IPAddressPool
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: IPAddressPool
+      metadata:
+        name: default-pool
+        namespace: "{{ metallb_namespace }}"
+      spec:
+        addresses:
+          - "{{ metallb_ip_range }}"
+
+- name: Configure MetalLB L2Advertisement
+  kubernetes.core.k8s:
+    state: present
+    definition:
+      apiVersion: metallb.io/v1beta1
+      kind: L2Advertisement
+      metadata:
+        name: l2-advert
+        namespace: "{{ metallb_namespace }}"
+      spec:
+        ipAddressPools:
+          - default-pool
+
+- name: Install Ingress-Nginx
+  kubernetes.core.helm:
+    name: ingress-nginx
+    chart_ref: ingress-nginx/ingress-nginx
+    release_namespace: "{{ ingress_nginx_namespace }}"
+    version: "{{ ingress_nginx_version }}"
+    values:
+      controller:
+        service:
+          type: LoadBalancer
+
+- name: Install Cert-Manager
+  kubernetes.core.helm:
+    name: cert-manager
+    chart_ref: jetstack/cert-manager
+    release_namespace: "{{ cert_manager_namespace }}"
+    version: "{{ cert_manager_version }}"
+    values:
+      installCRDs: true
+
+- name: Install NFS Provisioner
+  kubernetes.core.helm:
+    name: nfs-subdir-external-provisioner
+    chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
+    release_namespace: "{{ nfs_provisioner_namespace }}"
+    version: "{{ nfs_provisioner_version }}"
+    values:
+      nfs:
+        server: "{{ nfs_server }}"
+        path: "{{ nfs_path }}"
+      storageClass:
+        name: "{{ odoo_storage_class }}"
+        defaultClass: true
+
+- name: Install Odoo
+  kubernetes.core.helm:
+    name: odoo
+    chart_ref: bitnami/odoo
+    release_namespace: "{{ odoo_namespace }}"
+    version: "{{ odoo_version }}"
+    values:
+      image:
+        tag: "16"
+      persistence:
+        storageClass: "{{ odoo_storage_class }}"
+      ingress:
+        enabled: true
+        hostname: "{{ odoo_hostname }}"
+        ingressClassName: nginx
+        annotations:
+          cert-manager.io/cluster-issuer: "letsencrypt-prod"
+        tls: true 
