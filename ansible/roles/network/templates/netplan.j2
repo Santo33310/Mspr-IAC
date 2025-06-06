@@ -1,0 +1,18 @@
+network:
+  version: 2
+  ethernets:
+    {{ ansible_default_ipv4.interface }}:
+      dhcp4: no
+      addresses:
+{% if inventory_hostname == 'k3s-worker-2' %}
+        - 192.168.1.86/24
+{% elif inventory_hostname == 'vm-nfs' %}
+        - 192.168.1.87/24
+{% elif inventory_hostname == 'k3s-master' %}
+        - 192.168.1.84/24
+{% elif inventory_hostname == 'k3s-worker-1' %}
+        - 192.168.1.85/24
+{% endif %}
+      gateway4: 192.168.1.254
+      nameservers:
+        addresses: [8.8.8.8, 8.8.4.4] 

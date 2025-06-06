@@ -45,10 +45,10 @@ variable "vm_ips" {
   description = "IPs des VMs"
   type = map(string)
   default = {
-    "k3s-master"    = "18"
-    "k3s-worker-1"  = "19"
-    "k3s-worker-2"  = "20"
-    "Vm-nfs"        = "21"
+    "k3s-master"    = "100"
+    "k3s-worker-1"  = "101"
+    "k3s-worker-2"  = "102"
+    "Vm-nfs"        = "110"
   }
 }
 

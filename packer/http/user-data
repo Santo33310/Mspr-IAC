@@ -5,14 +5,12 @@ autoinstall:
   keyboard:
     layout: fr
     variant: oss
-
   ssh:
     install-server: true
     allow-pw: true
     disable_root: false
     ssh_quiet_keygen: true
     allow_public_ssh_keys: true
-
   packages:
     - qemu-guest-agent
     - sudo
@@ -23,26 +21,22 @@ autoinstall:
     - ca-certificates
     - net-tools
     - vim
-
   storage:
     layout:
       name: direct
     swap:
       size: 0
+  user-data:
+    package_upgrade: false
+    timezone: Europe/Paris
+    users:
+      - name: ubuntu
+        groups: [adm, sudo]
+        lock-passwd: false
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        shell: /bin/bash
+        ssh_authorized_keys:
+          - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCoXkVNC1ZVGuiLCSIixFvkToEOI5nDHwBfj8ZMzkFcugMbteGUuqrd3ndFb690c6cHct1kIh0ba1gDGrGRwe/G2bnOtA6k05LazB0nfsi77bnADlB44uKYXSydWK8SogDSlYx48cCz98os5524mNqLzQbWu38zNGDgMC+3cQSoAZ2/VVJ9gNEsSB1XRMVD5m+OjfWiFwRNCVkXkYYZgNC5YNXgefQrDq9HXknpJbZMJUig5n4zaw2EqSJGg9bQD5YXeN0w5e95yyGXsSH3EL1Z6GFeDK7dIZ+MZD1ohW1V7mYzO2kDDTIdEZhlVRfiZPWTklc41G78wiXch8LNOL5GoJGqszXcMnLt9Q+PJlghGIOQ5wAEQKanODlo6unXfBEZB75ZiA+AxiaqopnLz8iRRIvLe7dd54aqCui9hhLkVdQBsyOUuWsLNC1/KObVxpPttphygtz2gsn1wFWSQVKvfHLyOw+wdHJhcYJpqf7lu9BvXDC1xCHJZh3ZXqpc3ts= SANTOPC1+faust@Santopc1
 
-  network:
-    version: 2
-    ethernets:
-      ens18:
-        dhcp4: true
-
-  identity:
+        passwd: "$6$rounds=4096$RmzSUvWt8/0DitQx$XatFLTvKjYTSWKQTYdT4TvPsCzgPI1FNpmZ.g/59z7kJS45AqjIqGj3raVljRJjsaeFKOFRkKGku.TJOmjczM."
     hostname: ubuntu-template
-    username: ubuntu
-    password: "$6$rounds=4096$RmzSUvWt8/0DitQx$XatFLTvKjYTSWKQTYdT4TvPsCzgPI1FNpmZ.g/59z7kJS45AqjIqGj3raVljRJjsaeFKOFRkKGku.TJOmjczM."
-
-  late-commands:
-    - echo 'ubuntu ALL=(ALL) NOPASSWD:ALL' > /target/etc/sudoers.d/90-cloud-init-users
-    - chmod 440 /target/etc/sudoers.d/90-cloud-init-users
-
-  timezone: Europe/Paris

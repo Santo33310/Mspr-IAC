@@ -1,5 +1,0 @@
-.vagrant/
-*.log
-*.retry
-*.tfstate*
-__pycache__/

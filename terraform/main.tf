@@ -118,19 +118,15 @@ resource "proxmox_virtual_environment_vm" "k3s-workers" {
 
   initialization {
     datastore_id = "local-lvm"
-    dns {
-      domain  = "lab.local"
-      servers = ["1.1.1.1", "8.8.8.8"]
-    }
     ip_config {
       ipv4 {
-        address = "${var.network_config.base_ip}.${var.vm_ips["k3s-worker-${count.index + 1}"]}/${var.network_config.subnet}"
-        gateway = var.network_config.gateway
+        address = "192.168.1.${101 + count.index}/24"
+        gateway = "192.168.1.1"
       }
     }
     user_account {
       username = "ubuntu"
-      password = var.vm_password
+      password = "admin"
       keys     = [local.ssh_public_key]
     }
   }
@@ -184,19 +180,15 @@ resource "proxmox_virtual_environment_vm" "Vm-nfs" {
 
   initialization {
     datastore_id = "local-lvm"
-    dns {
-      domain  = "lab.local"
-      servers = ["1.1.1.1", "8.8.8.8"]
-    }
     ip_config {
       ipv4 {
-        address = "${var.network_config.base_ip}.${var.vm_ips["Vm-nfs"]}/${var.network_config.subnet}"
-        gateway = var.network_config.gateway
+        address = "192.168.1.103/24"
+        gateway = "192.168.1.1"
       }
     }
     user_account {
       username = "ubuntu"
-      password = var.vm_password
+      password = "admin"
       keys     = [local.ssh_public_key]
     }
   }
