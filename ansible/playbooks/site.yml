@@ -4,18 +4,9 @@
 #   - master    : Installation du nœud master K3s
 #   - workers   : Installation des nœuds workers K3s
 #   - addons    : Installation des addons Kubernetes (MetalLB, Ingress, etc.)
-#   - network   : Configuration réseau uniquement
 #   - cluster   : Installation complète du cluster (master + workers)
-#   - all       : Installation complète (cluster + addons)
-
-- name: Configure Network
-  hosts: all
-  become: true
-  tags: 
-    - network
-  roles:
-    - network
-
+#   - nfs       : Configuration du serveur NFS
+#   - all       : Installation complète (cluster + addons + nfs)
 - name: Deploy K3s Cluster - Master Node
   hosts: master
   become: true
@@ -25,6 +16,13 @@
     - all
   roles:
     - k3s_master
+
+- name: Propager le token K3s à tous les hôtes
+  hosts: all
+  gather_facts: false
+  tasks:
+    - set_fact:
+        k3s_node_token: "{{ hostvars[groups['master'][0]]['k3s_node_token'] }}"
 
 - name: Deploy K3s Cluster - Worker Nodes
   hosts: worker
@@ -36,6 +34,15 @@
   roles:
     - k3s_worker
 
+- name: Configure NFS Server
+  hosts: nfs
+  become: true
+  tags:
+    - nfs
+    - all
+  roles:
+    - nfs_server
+
 - name: Deploy K3s Cluster - Kubernetes Addons
   hosts: master
   become: true
@@ -43,4 +50,4 @@
     - addons
     - all
   roles:
-    - k8s_addons 
+    - k8s_addons

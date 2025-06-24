@@ -1,0 +1,28 @@
+# Fichiers et dossiers sensibles ou inutiles à ne pas versionner
+
+# Clés SSH
+*.pem
+*.key
+*.pub
+id_rsa
+id_rsa.pub
+
+# Fichiers de variables contenant des credentials
+packer/variables.pkrvars.hcl
+terraform/terraform.tfvars
+
+# Fichiers de configuration locaux
+*.tfstate
+*.tfstate.*
+.terraform/
+
+# Fichiers de sortie et logs
+*.log
+*.out
+*.bak
+
+# Windows
+*.Zone.Identifier
+
+# Autres fichiers à ignorer
+packer/packer_cache/ 

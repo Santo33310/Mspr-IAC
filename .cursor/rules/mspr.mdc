@@ -1,7 +1,0 @@
----
-description: 
-globs: 
-alwaysApply: false
----
-packer build ubuntu-24.04.pkr.hcl
-

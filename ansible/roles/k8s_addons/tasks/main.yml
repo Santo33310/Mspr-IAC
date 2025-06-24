@@ -1,14 +1,39 @@
 ---
+- name: Ensure .kube directory exists for ubuntu
+  file:
+    path: /home/ubuntu/.kube
+    state: directory
+    owner: ubuntu
+    group: ubuntu
+    mode: '0700'
+
+- name: Copy k3s kubeconfig to /home/ubuntu/.kube/config
+  copy :
+    src: /etc/rancher/k3s/k3s.yaml
+    dest: /home/ubuntu/.kube/config
+    remote_src: yes
+    owner: ubuntu
+    group: ubuntu
+    mode: '0600'
+
 - name: Install pip packages
   pip:
     name:
       - kubernetes
       - openshift
       - PyYAML
+    extra_args: --break-system-packages
     state: present
+
+- name: Set KUBECONFIG for all following tasks
+  set_fact:
+    ansible_python_interpreter: /usr/bin/python3
+    kubeconfig_path: "/home/ubuntu/.kube/config"
+  tags: always
 
 - name: Create namespaces
   kubernetes.core.k8s:
+    kubeconfig: "{{ kubeconfig_path }}"
     state: present
     definition:
       apiVersion: v1
@@ -18,9 +43,27 @@
   loop:
     - "{{ metallb_namespace }}"
     - "{{ ingress_nginx_namespace }}"
-    - "{{ cert_manager_namespace }}"
     - "{{ nfs_provisioner_namespace }}"
     - "{{ odoo_namespace }}"
+
+- name: Download Helm install script
+  get_url:
+    url: https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3
+    dest: /tmp/get-helm-3
+    mode: '0755'
+
+- name: Install Helm
+  shell: /tmp/get-helm-3
+  args:
+    creates: /usr/local/bin/helm
+- name: Check Helm version (debug)
+  command: helm version
+  register: helm_version
+  changed_when: false
+
+- name: Debug Helm version
+  debug:
+    var: helm_version.stdout
 
 - name: Add Helm repositories
   kubernetes.core.helm_repository:
@@ -38,10 +81,11 @@
     name: metallb
     chart_ref: metallb/metallb
     release_namespace: "{{ metallb_namespace }}"
-    version: "{{ metallb_version }}"
+    chart_version: "{{ metallb_version }}"
     wait: true
+    kubeconfig: /home/ubuntu/.kube/config
 
-- name: Configure MetalLB IPAddressPool
+- name: Configure MetalLB ipAddressPools  
   kubernetes.core.k8s:
     state: present
     definition:
@@ -53,6 +97,7 @@
       spec:
         addresses:
           - "{{ metallb_ip_range }}"
+    kubeconfig: /home/ubuntu/.kube/config
 
 - name: Configure MetalLB L2Advertisement
   kubernetes.core.k8s:
@@ -66,33 +111,26 @@
       spec:
         ipAddressPools:
           - default-pool
+    kubeconfig: /home/ubuntu/.kube/config
 
 - name: Install Ingress-Nginx
   kubernetes.core.helm:
     name: ingress-nginx
     chart_ref: ingress-nginx/ingress-nginx
     release_namespace: "{{ ingress_nginx_namespace }}"
-    version: "{{ ingress_nginx_version }}"
+    chart_version: "{{ ingress_nginx_version }}"
     values:
       controller:
         service:
           type: LoadBalancer
-
-- name: Install Cert-Manager
-  kubernetes.core.helm:
-    name: cert-manager
-    chart_ref: jetstack/cert-manager
-    release_namespace: "{{ cert_manager_namespace }}"
-    version: "{{ cert_manager_version }}"
-    values:
-      installCRDs: true
+    kubeconfig: /home/ubuntu/.kube/config
 
 - name: Install NFS Provisioner
   kubernetes.core.helm:
     name: nfs-subdir-external-provisioner
     chart_ref: nfs-subdir-external-provisioner/nfs-subdir-external-provisioner
     release_namespace: "{{ nfs_provisioner_namespace }}"
-    version: "{{ nfs_provisioner_version }}"
+    chart_version: "{{ nfs_provisioner_version }}"
     values:
       nfs:
         server: "{{ nfs_server }}"
@@ -100,22 +138,21 @@
       storageClass:
         name: "{{ odoo_storage_class }}"
         defaultClass: true
+    kubeconfig: /home/ubuntu/.kube/config
 
 - name: Install Odoo
   kubernetes.core.helm:
     name: odoo
     chart_ref: bitnami/odoo
     release_namespace: "{{ odoo_namespace }}"
-    version: "{{ odoo_version }}"
+    chart_version: "{{ odoo_version }}"
     values:
       image:
-        tag: "16"
+        tag: "15"
       persistence:
         storageClass: "{{ odoo_storage_class }}"
       ingress:
         enabled: true
         hostname: "{{ odoo_hostname }}"
         ingressClassName: nginx
-        annotations:
-          cert-manager.io/cluster-issuer: "letsencrypt-prod"
-        tls: true 
+    kubeconfig: /home/ubuntu/.kube/config

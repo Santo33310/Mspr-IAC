@@ -1,0 +1,6 @@
+---
+# Chemin du répertoire d'export NFS
+nfs_export_dir: /srv/nfs
+
+# Réseau autorisé pour NFS
+nfs_allowed_network: 192.168.1.0/24 

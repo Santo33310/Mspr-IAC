@@ -1,0 +1,43 @@
+---
+# Installation des paquets NFS
+- name: Install NFS server packages
+  apt:
+    name:
+      - nfs-kernel-server
+      - nfs-common
+    state: present
+    update_cache: yes
+
+# Création du répertoire d'export NFS
+- name: Create NFS export directory
+  file:
+    path: /srv/nfs
+    state: directory
+    mode: '0755'
+    owner: nobody
+    group: nogroup
+
+# Configuration des exports NFS
+- name: Configure NFS exports
+  template:
+    src: exports.j2
+    dest: /etc/exports
+    mode: '0644'
+  notify: restart nfs
+
+# S'assurer que le service NFS est activé et démarré
+- name: Enable and start NFS server
+  systemd:
+    name: nfs-kernel-server
+    state: started
+    enabled: yes
+
+# Configuration du pare-feu
+- name: Allow NFS through UFW
+  ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop:
+    - 2049  # NFS
+    - 111   # portmapper 

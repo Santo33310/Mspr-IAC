@@ -1,20 +1,4 @@
 ---
-- name: Set hostname
-  hostname:
-    name: "{{ inventory_hostname }}"
-  register: hostname_changed
-
-- name: Update /etc/hosts
-  lineinfile:
-    path: /etc/hosts
-    line: "127.0.1.1 {{ inventory_hostname }}"
-    regexp: '^127\.0\.1\.1'
-    state: present
-
-- name: Reboot if hostname changed
-  reboot:
-  when: hostname_changed.changed
-
 - name: Install required packages
   apt:
     name: "{{ system_packages }}"
@@ -31,6 +15,18 @@
     regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
     replace: '# \1'
 
+- name: Load br_netfilter module
+  modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Ensure br_netfilter module is loaded at boot
+  lineinfile:
+    path: /etc/modules-load.d/k8s.conf
+    line: br_netfilter
+    create: yes
+    mode: '0644'
+
 - name: Configure sysctl for Kubernetes
   sysctl:
     name: "{{ item.name }}"
@@ -42,13 +38,45 @@
     - { name: "net.ipv4.ip_forward", value: "1" }
     - { name: "vm.swappiness", value: "0" }
 
-- name: Install K3s agent
-  shell: |
-    curl -sfL https://get.k3s.io | \
-    INSTALL_K3S_VERSION={{ k3s_version }} \
-    K3S_URL=https://{{ k3s_master_ip }}:6443 \
-    K3S_TOKEN={{ hostvars[groups['master'][0]]['k3s_node_token'] }} \
-    INSTALL_K3S_EXEC="agent {{ k3s_extra_agent_args }}" \
-    sh -
-  args:
-    creates: /usr/local/bin/k3s 
+- name: Check connectivity to master API server
+  wait_for:
+    host: "{{ hostvars[groups['master'][0]]['ansible_host'] }}"
+    port: 6443
+    timeout: 30
+    state: started
+
+- name: Vérifier la version de K3s installée (si existante)
+  command: k3s --version
+  register: k3s_version_output
+  changed_when: false
+  ignore_errors: true
+
+- name: Définir la version installée de K3s
+  when: k3s_version_output.rc == 0
+  set_fact:
+    installed_k3s_version: "{{ k3s_version_output.stdout_lines[0].split(' ')[2] }}"
+
+- name: Installer K3s agent si besoin
+  when: k3s_version_output.rc != 0 or installed_k3s_version is version(k3s_version, '<')
+  block:
+    - name: Télécharger le script d'installation K3s
+      get_url:
+        url: https://get.k3s.io/
+        dest: /usr/local/bin/k3s-install.sh
+        mode: "0755"
+
+    - name: Installer K3s agent
+      shell: |
+        INSTALL_K3S_VERSION={{ k3s_version }} \
+        K3S_URL=https://{{ hostvars[groups['master'][0]]['ansible_host'] }}:6443 \
+        K3S_TOKEN={{ k3s_node_token }} \
+        INSTALL_K3S_EXEC="agent {{ k3s_extra_agent_args | default('') }}" \
+        sh /usr/local/bin/k3s-install.sh
+      args:
+        creates: /usr/local/bin/k3s
+
+- name: S'assurer que le service K3s agent est démarré et activé
+  systemd:
+    name: k3s-agent
+    state: started
+    enabled: true 
